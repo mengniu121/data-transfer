@@ -1,90 +1,118 @@
-# 数据库迁移工具
+# 数据迁移工具
 
-这是一个用于SQL Server数据库迁移的Python工具，支持一对一、一对多和多对一的表迁移，并提供灵活的数据转换功能。
+这是一个用于数据迁移的工具，支持多种迁移模式，包括一对一、一对多和多对一的表数据迁移。
 
 ## 功能特点
 
 - 支持多种迁移模式：
-  - 一对一：从旧库的表迁移到新库的单个表
-  - 一对多：从旧库的单个表迁移到新库的多个表
-  - 多对一：从多个旧库的表合并到新库的单个表
-- 通过Excel配置文件定义迁移关系
+  - 一对一迁移（One-to-One）
+  - 一对多迁移（One-to-Many）
+  - 多对一迁移（Many-to-One）
+- 支持Excel配置文件
 - 支持数据类型转换
-- 支持默认值设置
-- 支持自定义转换规则
-- 批量处理以提高性能
-- 事务支持，确保数据一致性
+- 支持批量数据插入
+- 支持事务管理
+- 支持环境变量配置
 
-## 安装要求
+## 项目结构
 
-1. Python 3.7+
+```
+.
+├── main.py                    # 主程序入口
+├── main2.py                   # 测试数据生成程序入口
+├── excel_parser.py            # Excel配置文件解析器
+├── db_connector.py            # 数据库连接器（用于数据迁移）
+├── db_connector2.py           # 数据库连接器（用于测试数据生成）
+├── data_migration_onetoone.py # 一对一迁移实现
+├── data_migration_onetomany.py# 一对多迁移实现
+├── data_migration_manytoone.py# 多对一迁移实现
+├── util.py                    # 通用工具函数
+├── requirements.txt           # 项目依赖
+└── .env                      # 环境变量配置文件
+```
+
+## 环境要求
+
+- Python 3.8+
+- SQL Server数据库
+- 必要的Python包（见requirements.txt）
+
+## 安装
+
+1. 克隆项目到本地
 2. 安装依赖包：
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. 配置环境变量（.env文件）：
+   ```
+   # 源数据库配置
+   SOURCE_DB_SERVER=your_source_server
+   SOURCE_DB_NAME=your_source_database
+   SOURCE_DB_USER=your_source_username
+   SOURCE_DB_PASSWORD=your_source_password
+
+   # 目标数据库配置
+   TARGET_DB_SERVER=your_target_server
+   TARGET_DB_NAME=your_target_database
+   TARGET_DB_USER=your_target_username
+   TARGET_DB_PASSWORD=your_target_password
+   ```
+
+## 使用方法
+
+### 1. 数据迁移
+
+使用main.py执行数据迁移：
+
 ```bash
-pip install -r requirements.txt
+python main.py
 ```
 
-## 配置文件说明
+### 2. 生成测试数据
 
-迁移配置通过Excel文件进行管理，包含两个工作表：
+使用main2.py生成测试数据：
 
-### TableMappings工作表
-
-定义表之间的映射关系：
-
-- MappingName: 映射配置名称
-- MappingType: 映射类型（一对一、一对多、多对一）
-- SourceTables: 源表名称（多个表用逗号分隔）
-- TargetTables: 目标表名称（多个表用逗号分隔）
-
-### FieldMappings工作表
-
-定义字段之间的映射关系：
-
-- MappingName: 映射配置名称（与TableMappings中的对应）
-- TargetTable: 目标表名称
-- TargetField: 目标字段名称
-- SourceField: 源字段名称
-- TargetType: 目标字段类型
-- DefaultValue: 默认值（可选）
-- TransformRule: 转换规则（可选）
-
-## 环境变量配置
-
-创建 `.env` 文件并配置数据库连接信息：
-
-```
-SOURCE_DB_SERVER=source_server_name
-SOURCE_DB_NAME=source_db_name
-SOURCE_DB_USER=source_user
-SOURCE_DB_PASSWORD=source_password
-
-TARGET_DB_SERVER=target_server_name
-TARGET_DB_NAME=target_db_name
-TARGET_DB_USER=target_user
-TARGET_DB_PASSWORD=target_password
+```bash
+python main2.py
 ```
 
-## 使用示例
+## Excel配置文件格式
 
-```python
-from migration_executor import MigrationExecutor
+配置文件需要包含以下sheet：
 
-# 初始化迁移执行器
-executor = MigrationExecutor('migration_config.xlsx')
+1. マッピング一覧（Mapping List）
+   - 包含所有需要迁移的表配置
+   - 指定迁移类型（一对一、一对多、多对一）
+   - 指定源表和目标表
 
-# 执行指定的迁移配置
-executor.execute_migration('mapping_name', batch_size=1000)
-```
+2. 每个表的配置sheet
+   - 字段映射关系
+   - 数据类型转换规则
+   - 表联合条件（多对一迁移）
 
 ## 注意事项
 
-1. 确保已安装SQL Server驱动程序
-2. 配置文件中的表名和字段名要与数据库中的完全匹配
-3. 建议在执行迁移前备份目标数据库
-4. 对于大量数据迁移，可以调整batch_size参数优化性能
+1. 确保数据库连接信息正确
+2. 确保Excel配置文件格式正确
+3. 确保目标表已经创建
+4. 建议在执行迁移前备份数据
 
 ## 错误处理
 
-- 数据类型转换失败时，如果配置了默认值，将使用默认值
-- 如果没有配置默认值，将抛出异常
-- 所有的数据库操作都在事务中执行，确保数据一致性 
+- 程序会记录详细的错误信息
+- 支持事务回滚
+- 支持批量插入失败时的错误处理
+
+## 依赖包
+
+- pyodbc==4.0.39：数据库连接
+- pandas==2.1.4：数据处理
+- python-dotenv==1.0.0：环境变量管理
+- openpyxl==3.1.2：Excel文件处理
+- numpy==1.26.2：数值计算
+- tqdm==4.66.1：进度条显示
+
+## 许可证
+
+MIT License 
