@@ -3,24 +3,24 @@ import os
 
 load_dotenv()
 
-# 数据库连接配置
+# データベース接続設定
 SOURCE_DB_CONFIG = {
     'driver': 'SQL Server',
     'server': os.getenv('SOURCE_DB_SERVER'),
     'database': os.getenv('SOURCE_DB_NAME'),
-    'uid': os.getenv('DB_USER'),  # SQL Server身份验证用户名
-    'pwd': os.getenv('DB_PASSWORD')  # SQL Server身份验证密码
+    'uid': os.getenv('DB_USER'),  # SQL Server認証ユーザー名
+    'pwd': os.getenv('DB_PASSWORD')  # SQL Server認証パスワード
 }
 
 TARGET_DB_CONFIG = {
     'driver': 'SQL Server',
     'server': os.getenv('TARGET_DB_SERVER'),
     'database': os.getenv('TARGET_DB_NAME'),
-    'uid': os.getenv('DB_USER'),  # SQL Server身份验证用户名
-    'pwd': os.getenv('DB_PASSWORD')  # SQL Server身份验证密码
+    'uid': os.getenv('DB_USER'),  # SQL Server認証ユーザー名
+    'pwd': os.getenv('DB_PASSWORD')  # SQL Server認証パスワード
 }
 
-# 数据类型映射
+# データ型マッピング
 DATA_TYPE_MAPPINGS = {
     'int': str,
     'datetime': str,

@@ -5,29 +5,29 @@ from util import convert_type
 
 def execute_many_to_one_migration(excel_path: str, parser, source_db, target_db, sheets: List[MigrationSheet]):
     """
-    执行多对一迁移
-    :param excel_path: Excel文件路径
-    :param parser: Excel解析器实例
-    :param source_db: 源数据库连接
-    :param target_db: 目标数据库连接
-    :param sheets: 需要迁移的表配置列表
+    多対1データ移行の実行
+    :param excel_path: Excelファイルパス
+    :param parser: Excelパーサーインスタンス
+    :param source_db: ソースデータベース接続
+    :param target_db: ターゲットデータベース接続
+    :param sheets: 移行対象のテーブル設定リスト
     """
     try:
         for sheet in sheets:
-            print(f"\n处理表组 {sheet.logical_name}:")
-            print(f"目标表: {sheet.physical_name}")
+            print(f"\nテーブルグループ {sheet.logical_name} の処理:")
+            print(f"ターゲットテーブル: {sheet.physical_name}")
             
-            # 读取字段映射sheet
+            # フィールドマッピングシートの読み込み
             df = pd.read_excel(excel_path, sheet_name=sheet.logical_name)
             
-            # 用于存储源表的字段映射
+            # ソーステーブルのフィールドマッピングを保存するための辞書
             source_mappings = {}
             target_fields = []
             join_conditions = None
             
-            # 处理字段映射
+            # フィールドマッピングの処理
             for _, row in df.iterrows():
-                # 获取联合条件
+                # 結合条件の取得
                 if pd.notna(row.get('Union')):
                     join_conditions = str(row.get('Union')).strip()
                     
@@ -36,67 +36,67 @@ def execute_many_to_one_migration(excel_path: str, parser, source_db, target_db,
                     source_field = str(row.get('現行Type物理名'))
                     target_field = str(row.get('次期Type物理名'))
                     
-                    # 如果源表不存在，创建映射结构
+                    # ソーステーブルが存在しない場合、マッピング構造を作成
                     if source_table not in source_mappings:
                         source_mappings[source_table] = {
                             'fields': [],
                             'type_conversion': {}
                         }
                     
-                    # 添加字段映射
+                    # フィールドマッピングの追加
                     source_mappings[source_table]['fields'].append({
                         'source_field': source_field,
                         'target_field': target_field
                     })
                     
-                    # 添加类型转换规则
+                    # 型変換ルールの追加
                     source_mappings[source_table]['type_conversion'][source_field] = {
                         'data_type': str(row.get('データ型', '')),
                         'not_null': str(row.get('Not Null', '')).upper() == 'Y',
                         'default_value': row.get('デフォルト')
                     }
                     
-                    # 收集目标字段
+                    # ターゲットフィールドの収集
                     if target_field not in target_fields:
                         target_fields.append(target_field)
             
             if not source_mappings:
-                print("  警告: 没有找到需要迁移的字段")
+                print("  警告: 移行対象のフィールドが見つかりません")
                 continue
             
             if not join_conditions:
-                print("  警告: 未找到表联合条件")
+                print("  警告: テーブル結合条件が見つかりません")
                 continue
             
-            print(f"  使用联合条件: {join_conditions}")
+            print(f"  結合条件: {join_conditions}")
             
-            # 构建SELECT部分
+            # SELECT部分の構築
             select_parts = []
             for source_table, mapping in source_mappings.items():
                 for field in mapping['fields']:
                     table_alias = 'a' if source_table == 'dbo.Test1' else 'b'
                     select_parts.append(f"{table_alias}.{field['source_field']}")
             
-            # 使用Excel中指定的联合查询条件
+            # Excelで指定された結合クエリ条件の使用
             select_query = f"SELECT {', '.join(select_parts)} FROM {join_conditions}"
-            print(f"  执行查询: {select_query}")
+            print(f"  クエリ実行: {select_query}")
             
-            # 执行联合查询
+            # 結合クエリの実行
             rows = source_db.fetch_all(select_query)
             
             if not rows:
-                print(f"  警告: 源表联合查询没有返回数据")
+                print(f"  警告: ソーステーブルの結合クエリでデータが返されませんでした")
                 continue
             
-            print(f"  从源表读取到 {len(rows)} 条记录")
+            print(f"  ソーステーブルから {len(rows)} 件のレコードを読み取りました")
             
-            # 准备插入语句
+            # 挿入文の準備
             insert_query = f"INSERT INTO {sheet.physical_name} ({', '.join(target_fields)}) VALUES ({', '.join(['?' for _ in target_fields])})"
-            print(f"  执行插入: {insert_query}")
+            print(f"  挿入実行: {insert_query}")
             
-            # 逐行处理数据
+            # データの行ごとの処理
             for i, row_data in enumerate(rows, 1):
-                # 转换数据
+                # データの変換
                 converted_values = []
                 field_index = 0
                 
@@ -109,23 +109,23 @@ def execute_many_to_one_migration(excel_path: str, parser, source_db, target_db,
                         field_index += 1
                 
                 try:
-                    # 执行插入
+                    # 挿入の実行
                     target_db.execute_query(insert_query, converted_values)
                     
-                    # 每100条记录提交一次
+                    # 100件ごとにトランザクションをコミット
                     if i % 100 == 0:
                         target_db.commit()
-                        print(f"  已处理 {i}/{len(rows)} 条记录")
+                        print(f"  {i}/{len(rows)} 件のレコードを処理しました")
                 except Exception as e:
                     target_db.rollback()
-                    print(f"  插入失败: {str(e)}")
+                    print(f"  挿入エラー: {str(e)}")
                     continue
             
-            # 提交剩余的事务
+            # 残りのトランザクションのコミット
             target_db.commit()
-            print(f"  迁移成功完成，共处理 {len(rows)} 条记录")
+            print(f"  移行が完了しました。合計 {len(rows)} 件のレコードを処理しました")
             
     except Exception as e:
-        print(f"多对一迁移过程中发生错误: {str(e)}")
+        print(f"多対1移行中にエラーが発生しました: {str(e)}")
         import traceback
         traceback.print_exc() 

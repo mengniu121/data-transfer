@@ -4,18 +4,18 @@ from config import SOURCE_DB_CONFIG, TARGET_DB_CONFIG
 class DatabaseConnector:
     def __init__(self, is_source=True):
         """
-        初始化数据库连接器
-        :param is_source: True表示源数据库，False表示目标数据库
+        データベース接続の初期化
+        :param is_source: Trueはソースデータベース、Falseはターゲットデータベース
         """
         self.config = SOURCE_DB_CONFIG if is_source else TARGET_DB_CONFIG
         self.conn = None
         self.cursor = None
 
     def connect(self):
-        """建立数据库连接"""
+        """データベース接続の確立"""
         if not self.conn:
             try:
-                # 使用标准的ODBC连接字符串格式
+                # 標準的なODBC接続文字列フォーマットを使用
                 conn_str = (
                     "Driver={SQL Server};"
                     f"Server={self.config['server']};"
@@ -24,21 +24,21 @@ class DatabaseConnector:
                     f"Pwd={self.config['pwd']};"
                     "TrustServerCertificate=yes"
                 )
-                print(f"尝试连接到数据库，连接字符串: {conn_str}")
+                print(f"データベースへの接続を試みます。接続文字列: {conn_str}")
                 self.conn = pyodbc.connect(conn_str)
                 self.cursor = self.conn.cursor()
-                print(f"成功连接到数据库: {self.config['server']}/{self.config['database']}")
+                print(f"データベースへの接続が成功しました: {self.config['server']}/{self.config['database']}")
             except pyodbc.Error as e:
-                print(f"连接失败: {str(e)}")
+                print(f"接続に失敗しました: {str(e)}")
                 raise
         return self.cursor
 
     def execute_query(self, query, params=None):
         """
-        执行SQL查询
-        :param query: SQL查询语句
-        :param params: 查询参数
-        :return: 查询结果
+        SQLクエリの実行
+        :param query: SQLクエリ文
+        :param params: クエリパラメータ
+        :return: クエリ結果
         """
         cursor = self.connect()
         if params:
@@ -49,26 +49,26 @@ class DatabaseConnector:
 
     def fetch_all(self, query, params=None):
         """
-        获取所有查询结果
-        :param query: SQL查询语句
-        :param params: 查询参数
-        :return: 查询结果列表
+        クエリ結果の全件取得
+        :param query: SQLクエリ文
+        :param params: クエリパラメータ
+        :return: クエリ結果リスト
         """
         cursor = self.execute_query(query, params)
         return cursor.fetchall()
 
     def commit(self):
-        """提交事务"""
+        """トランザクションのコミット"""
         if self.conn:
             self.conn.commit()
 
     def rollback(self):
-        """回滚事务"""
+        """トランザクションのロールバック"""
         if self.conn:
             self.conn.rollback()
 
     def close(self):
-        """关闭数据库连接"""
+        """データベース接続のクローズ"""
         if self.cursor:
             self.cursor.close()
         if self.conn:
@@ -77,9 +77,9 @@ class DatabaseConnector:
             self.cursor = None
 
     def __enter__(self):
-        """上下文管理器入口"""
+        """コンテキストマネージャーのエントリー"""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """上下文管理器出口"""
+        """コンテキストマネージャーのエグジット"""
         self.close() 
