@@ -112,13 +112,13 @@ def main():
     メイン関数
     """
     # コマンドライン引数のチェック
-    # if len(sys.argv) != 2:
-    #     print("使用方法: python main3.py <マッピング一覧名称>")
-    #     sys.exit(1)
+    if len(sys.argv) != 2:
+        print("使用方法: python main3.py <マッピング一覧名称>")
+        sys.exit(1)
     
     # マッピング名パラメータの取得
-    # mapping_name = sys.argv[1]
-    mapping_name="dbo.AccountingDetailTbl"
+    mapping_name = sys.argv[1]
+    # mapping_name="dbo.AccountingDetailTbl"
     excel_path = "数据移行2.xlsx"
     # 移行の実行
     executor = DataMigrationExecutor(excel_path)
