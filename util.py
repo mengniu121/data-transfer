@@ -4,10 +4,10 @@ def convert_type(value, conversion_rule):
     """
     根据转换规则转换数据类型
     """
-    if value is None:
-        if conversion_rule.get('not_null', False):
-            return conversion_rule.get('default_value', '')
-        return None
+    # if value is None:
+    #     if conversion_rule.get('not_null', False):
+    #         return conversion_rule.get('default_value', '')
+    #     return None
         
     try:
         data_type = conversion_rule.get('data_type', '').lower()

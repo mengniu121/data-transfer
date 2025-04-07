@@ -17,7 +17,7 @@ class DatabaseConnector:
             try:
                 # 標準的なODBC接続文字列フォーマットを使用
                 conn_str = (
-                    "Driver={SQL Server};"
+                    "Driver={ODBC Driver 17 for SQL Server};"
                     f"Server={self.config['server']};"
                     f"Database={self.config['database']};"
                     f"Uid={self.config['uid']};"
