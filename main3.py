@@ -1,7 +1,7 @@
 import sys
 from excel_parser import ExcelParser, MigrationSheet, MigrationType
 from db_connector import DatabaseConnector
-from data_migration_onetoone import execute_one_to_one_migration
+from data_migration_onetoone3 import execute_one_to_one_migration
 from data_migration_onetomany import execute_one_to_many_migration
 from data_migration_manytoone import execute_many_to_one_migration
 

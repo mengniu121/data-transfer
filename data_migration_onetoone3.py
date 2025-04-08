@@ -138,11 +138,11 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
                 
                 # 各行データを処理
                 insert_count = 0
-                batch_error_records = []  # 当前批次的错误记录
+                batch_error_records = []  # 現在のバッチのエラーレコード
                 
                 for row_data in rows:
                     insert_values = []
-                    row_dict = {}  # 用于错误记录的行数据
+                    row_dict = {}  # エラーログの行データ
                     
                     try:
                         for target_field in insert_fields_list:
@@ -154,7 +154,7 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
                                 source_field = next((k for k, v in select_fields.items() if v == target_field), None)
                                 if source_field:
                                     value = row_data[list(select_fields.keys()).index(source_field)]
-                                    # 记录原始值
+                                    # 元の値を記録します
                                     row_dict[source_field] = value
                                     # 型変換を適用
                                     conversion_rule = type_conversion_mapping.get(source_field)
@@ -163,7 +163,7 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
                                 else:
                                     value = None
                             
-                            # 将值转换为字符串格式
+                            # 値を文字列形式に変換する
                             if value is None:
                                 row_dict[target_field] = ''
                             elif isinstance(value, datetime.datetime):
@@ -187,18 +187,18 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
                         # target_db.rollback()
                         continue
                     
-                    # 每100条记录提交一次
+                    # 100件のレコードごとに1回送信
                     if insert_count % 100 == 0:
                         target_db.commit()
                         print(f"    {insert_count}/{len(rows)} 件のレコードが挿入されました")
                 
-                # 提交剩余的事务
+                # 残りのトランザクションをコミットする
                 target_db.commit()
                 
-                # 记录错误数据
+                # エラーデータをログに記録する
                 if batch_error_records:
                     error_records.extend(batch_error_records)
-                    # 如果是第一批数据，需要写入表头
+                    # 最初のデータバッチの場合は、ヘッダーを書き込む必要があります
                     write_header = not error_log_file.exists()
                     with open(error_log_file, 'a', newline='', encoding='utf-8') as f:
                         writer = csv.DictWriter(f, fieldnames=batch_error_records[0].keys())
