@@ -125,9 +125,9 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
             batch_count = 0
             error_count = 0
             
-            while offset < total_count:
+            while offset < batch_size: #total_count:
                 # ページングクエリを作成
-                select_query = f"SELECT {', '.join(select_fields.keys())} FROM {sheet.source_name} ORDER BY (SELECT NULL) OFFSET {offset} ROWS FETCH NEXT {batch_size} ROWS ONLY"
+                select_query = f"SELECT [{'], ['.join(select_fields.keys())}] FROM {sheet.source_name} ORDER BY (SELECT NULL) OFFSET {offset} ROWS FETCH NEXT {batch_size} ROWS ONLY"
                 print(f"  バッチ {batch_count + 1} 実行中: {select_query}")
                 rows = source_db.fetch_all(select_query)
                 
