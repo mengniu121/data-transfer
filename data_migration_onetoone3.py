@@ -160,6 +160,13 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
                                     conversion_rule = type_conversion_mapping.get(source_field)
                                     if conversion_rule:
                                         value = convert_type(value, conversion_rule)
+                                        if isinstance(value, str):
+                                            if len(value) > 4 and target_field.strip() == 'FiscalYear':
+                                                value = value[:4]
+                                            elif len(value) > 6 and target_field.strip() == 'OutputYM':
+                                                value = f"{value[:4]}{value[5:7]}"
+                                            elif len(value) > 6 and target_field.strip() == 'AccountingYM':
+                                                value = f"{value[:4]}{value[5:7]}"
                                 else:
                                     value = None
                             

@@ -20,6 +20,10 @@ def convert_type(value, conversion_rule):
             return None  # DBにNULLで入れたい場合
         
         if 'varchar' in data_type or 'nvarchar' in data_type:
+            if value == True:
+                value = '1'
+            elif value == False:
+                value = '0'
             return str(value)
         elif data_type == 'int':
             return int(float(value))
@@ -32,8 +36,14 @@ def convert_type(value, conversion_rule):
                 return None
             if value=='00000000':
                 return None
+            if value=='000':
+                return None
+            if value=='//':
+                return None
             date_str = str(value).strip()
             if date_str=='nan':
+                return None
+            if date_str=='':
                 return None
             if len(date_str) == 8 and date_str.isdigit():
                 year = date_str[:4]
