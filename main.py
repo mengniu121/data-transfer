@@ -3,7 +3,7 @@ from excel_parser import ExcelParser, MigrationType
 from db_connector import DatabaseConnector
 import os
 from dotenv import load_dotenv
-from data_migration_onetoone import execute_one_to_one_migration
+from data_migration_onetoone3 import execute_one_to_one_migration
 from data_migration_onetomany import execute_one_to_many_migration
 from data_migration_manytoone import execute_many_to_one_migration
 
@@ -132,7 +132,7 @@ def main():
     """
     メインプログラム
     """
-    excel_path = "数据移行2.xlsx"
+    excel_path = "データ移行.xlsx"
     executor = DataMigrationExecutor(excel_path)
     executor.execute_migration()
 
