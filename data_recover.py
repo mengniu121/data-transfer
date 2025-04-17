@@ -189,59 +189,72 @@ def main():
         
         # データベース接続の作成
         print("\nデータベースに接続中...")
+        source_db = DatabaseConnector(is_source=True)
         target_db = DatabaseConnector(is_source=False)
         
         # データベース接続の確認
+        if source_db is None:
+            raise Exception("ソースデータベース接続に失敗しました")
         if target_db is None:
             raise Exception("ターゲットデータベース接続に失敗しました")
             
         print("データベース接続に成功しました")
 
         # コマンドライン引数のチェック
-        # if len(sys.argv) != 2:
-        #     print("使用方法: python main3.py <マッピング一覧名称>")
-        #     sys.exit(1)
+        if len(sys.argv) != 2:
+            print("使用方法: python main3.py <マッピング一覧名称>")
+            sys.exit(1)
         
         # マッピング名パラメータの取得
-        # mapping_name = sys.argv[1]
-        mapping_name="dbo.AccountingDetailTbl"
+        mapping_name = sys.argv[1]
+        # mapping_name="dbo.AgencyTransaction"
         # Excelパーサーの作成
-        excel_path = "数据移行2.xlsx"
+        excel_path = "データ移行.xlsx"
         parser = ExcelParser(excel_path)
         
         # 対応するシートの取得
-        target_sheet = parser.parse_mapping_data_to_run(mapping_name)
+        target_sheets = parser.parse_mapping_data_to_run(mapping_name)
         
-        if not target_sheet:
+        if not target_sheets:
             print(f"エラー: マッピング名 '{mapping_name}' に対応する設定が見つかりません")
             return
+
+        for target_sheet in target_sheets:    
+            # 対応するエラーログファイルの取得
+            error_files = get_error_files(target_sheet.source_name)
+            if not error_files:
+                print(f"テーブル '{target_sheet.source_name}' のエラーログファイルが見つかりません")
+                return
+                
+            print("以下のエラーログファイルが見つかりました:")
+            for i, file in enumerate(error_files, 1):
+                print(f"{i}. {file.name} ({datetime.datetime.fromtimestamp(file.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')})")
             
-        # 対応するエラーログファイルの取得
-        error_files = get_error_files(target_sheet.source_name)
-        if not error_files:
-            print(f"テーブル '{target_sheet.source_name}' のエラーログファイルが見つかりません")
-            return
+            # ユーザーにファイル選択を促す
+            while True:
+                try:
+                    choice = int(input("\n処理するファイル番号を選択してください（終了するには0を入力）: "))
+                    if choice == 0:
+                        return
+                    if 1 <= choice <= len(error_files):
+                        break
+                    print("無効な選択です。もう一度やり直してください")
+                except ValueError:
+                    print("有効な数字を入力してください")
             
-        print("以下のエラーログファイルが見つかりました:")
-        for i, file in enumerate(error_files, 1):
-            print(f"{i}. {file.name} ({datetime.datetime.fromtimestamp(file.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')})")
-        
-        # ユーザーにファイル選択を促す
-        while True:
-            try:
-                choice = int(input("\n処理するファイル番号を選択してください（終了するには0を入力）: "))
-                if choice == 0:
-                    return
-                if 1 <= choice <= len(error_files):
-                    break
-                print("無効な選択です。もう一度やり直してください")
-            except ValueError:
-                print("有効な数字を入力してください")
-        
-        error_file = error_files[choice - 1]
-        
-        # エラーデータを処理する
-        recover_data(excel_path, target_db, error_file, target_sheet.logical_name, target_sheet)
+            error_file = error_files[choice - 1]
+            
+            # エラーデータを処理する
+            recover_data(excel_path, target_db, error_file, target_sheet.logical_name, target_sheet)
+
+            # 移行前レコード数の取得
+            count_query = f"SELECT COUNT(*) as total FROM {target_sheet.source_name}"
+            total_count = source_db.fetch_all(count_query)[0][0]
+            # 移行後レコード数の取得
+            target_count_query = f"SELECT COUNT(*) as total FROM {target_sheet.physical_name}"
+            target_total_count = target_db.fetch_all(target_count_query)[0][0]
+            print(f"  移行前レコード数: {total_count}")
+            print(f"  移行後レコード数: {target_total_count}")           
         
     except Exception as e:
         print(f"プログラム実行中にエラーが発生しました: {str(e)}")

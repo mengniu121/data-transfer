@@ -48,7 +48,7 @@ class ExcelParser:
         self.excel_path = excel_path
         self.migration_sheets: Dict[str, MigrationSheet] = {}  # 論理名をキーとして使用
 
-    def parse_mapping_data_to_run(self, mapping_name: str) -> MigrationSheet:
+    def parse_mapping_data_to_run(self, mapping_name: str) -> List[MigrationSheet]:
         """
         指定されたマッピング名に基づいて移行設定を解析
         :param mapping_name: マッピング一覧の値
@@ -57,37 +57,41 @@ class ExcelParser:
         try:
             # マッピング一覧シートの読み込み
             df = pd.read_excel(self.excel_path, sheet_name='マッピング一覧')
-            
+            sheets : Dict[str, MigrationSheet] = {}  # 論理名をキーとして使用
+
             # 指定されたマッピング名の検索
-            row = df[df['次期DB物理名'] == mapping_name]
-            if row.empty:
+            rows = df[df['次期DB物理名'] == mapping_name]
+            if rows.empty:
                 raise ValueError(f"マッピング名が見つかりません: {mapping_name}")
             
-            # 最初の一致行の取得
-            row = row.iloc[0]
+            # 一致行の取得
+            for index, row in rows.iterrows():
+            #row = rows.iloc[0]
             
-            # 必須フィールドのチェック
-            if pd.isna(row['次期DB物理名']) or pd.isna(row['現行DB物理名']):
-                raise ValueError(f"マッピング設定が不完全です: {mapping_name}")
+                # 必須フィールドのチェック
+                if pd.isna(row['次期DB物理名']) or pd.isna(row['現行DB物理名']):
+                    raise ValueError(f"マッピング設定が不完全です: {mapping_name}")
             
-            # 移行タイプの確定
-            migration_type_str = str(row.get('MigrationType', '')).lower()
-            if migration_type_str == 'one_to_one':
-                migration_type = MigrationType.ONE_TO_ONE
-            elif migration_type_str == 'one_to_many':
-                migration_type = MigrationType.ONE_TO_MANY
-            elif migration_type_str == 'many_to_one':
-                migration_type = MigrationType.MANY_TO_ONE
-            else:
-                raise ValueError(f"サポートされていない移行タイプです: {migration_type_str}")
+                # 移行タイプの確定
+                migration_type_str = str(row.get('MigrationType', '')).lower()
+                if migration_type_str == 'one_to_one':
+                    migration_type = MigrationType.ONE_TO_ONE
+                elif migration_type_str == 'one_to_many':
+                    migration_type = MigrationType.ONE_TO_MANY
+                elif migration_type_str == 'many_to_one':
+                    migration_type = MigrationType.MANY_TO_ONE
+                else:
+                    raise ValueError(f"サポートされていない移行タイプです: {migration_type_str}")
             
-            # MigrationSheetオブジェクトの作成と返却
-            return MigrationSheet(
-                logical_name=str(row['次期DB論理名']),
-                physical_name=str(row['次期DB物理名']),
-                source_name=str(row['現行DB物理名']),
-                migration_type=migration_type
-            )  
+                # MigrationSheetオブジェクトの作成と返却
+                sheets[str(row['次期DB論理名'])] = (MigrationSheet(
+                    logical_name=str(row['次期DB論理名']),
+                    physical_name=str(row['次期DB物理名']),
+                    source_name=str(row['現行DB物理名']),
+                    migration_type=migration_type
+                ))
+
+            return [sheet for sheet in sheets.values()]
         except Exception as e:
             print(f"マッピングデータの解析中にエラーが発生しました: {str(e)}")
             raise
@@ -222,12 +226,12 @@ class ExcelParser:
 
                 if not is_valid or (not_null and converted_value is None and pd.isna(default_value)):
                     invalid_data.append({
-                        '表名': sheet_name,
-                        '源字段': source_column,
-                        '目标字段': target_column,
-                        '原始值': value,
-                        '目标类型': data_type,
-                        '行号': idx + 1
+                        'テーブル': sheet_name,
+                        'ソース列': source_column,
+                        'ターゲット列': target_column,
+                        '元の値': value,
+                        'ターゲット型': data_type,
+                        '行番号': idx + 1
                     })
                     continue
 
@@ -235,9 +239,9 @@ class ExcelParser:
                     converted_value = default_value
 
                 valid_data.append({
-                    '目标字段': target_column,
-                    '值': converted_value,
-                    '行号': idx + 1
+                    'ターゲット列': target_column,
+                    '値': converted_value,
+                    '行番号': idx + 1
                 })
 
         valid_df = pd.DataFrame(valid_data)

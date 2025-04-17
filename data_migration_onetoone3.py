@@ -7,6 +7,7 @@ from util import convert_type
 import os
 import csv
 from pathlib import Path
+import logging
 
 def process_default_value(default_config: str) -> Any:
     """
@@ -54,15 +55,21 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
         batch_size = int(os.getenv('READ_NUM', '1000'))
         print(f"バッチごとの処理データ数: {batch_size}")
         
-        # 创建错误日志目录
+        # エラーログディレクトリを作成する
         error_log_dir = Path("error_logs")
         error_log_dir.mkdir(exist_ok=True)
-        
+        # ログ設定（ファイル名やログレベルを指定）
+        logging.basicConfig(
+            filename=error_log_dir / f"migration_file_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log",  # 出力先のログファイル
+            level=logging.INFO,        # 出力するログのレベル
+            format='%(asctime)s - %(levelname)s - %(message)s'
+        )
+
         for sheet in sheets:
             print(f"\nテーブル {sheet.logical_name} を処理中:")
             print(f"ソーステーブル {sheet.source_name} からターゲットテーブル {sheet.physical_name} へ")
             
-            # 为每个表创建错误日志文件
+            # 各テーブルごとにエラーログファイルを作成する
             error_log_file = error_log_dir / f"error_log_{sheet.source_name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
             error_records = []
             
@@ -117,15 +124,22 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
             
             if total_count == 0:
                 print(f"  警告: ソーステーブル {sheet.source_name} にデータがありません")
+                # ログ出力
+                logging.info(f"移行前レコード数:{sheet.source_name} : 0")
+                logging.info(f"移行後レコード数:{sheet.physical_name} : 0")
                 continue
             
+            # ログ出力
+            logging.info(f"移行前レコード数:{sheet.source_name} : {total_count}")
+
             # バッチ処理
             offset = 0
             processed_count = 0
             batch_count = 0
-            error_count = 0
+            error_count = 0            
+            commit_unit = 100
             
-            while offset < batch_size: #total_count:
+            while offset < total_count:
                 # ページングクエリを作成
                 select_query = f"SELECT [{'], ['.join(select_fields.keys())}] FROM {sheet.source_name} ORDER BY (SELECT NULL) OFFSET {offset} ROWS FETCH NEXT {batch_size} ROWS ONLY"
                 print(f"  バッチ {batch_count + 1} 実行中: {select_query}")
@@ -138,69 +152,123 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
                 
                 # 各行データを処理
                 insert_count = 0
+                source_values_list = []
+                insert_values_list = []
                 batch_error_records = []  # 現在のバッチのエラーレコード
                 
                 for row_data in rows:
                     insert_values = []
+                    source_values = []
                     row_dict = {}  # エラーログの行データ
                     
-                    try:
-                        for target_field in insert_fields_list:
-                            # フィールドにマージ処理が必要な場合
-                            if target_field in merge_fields:
-                                value = process_default_value(merge_fields[target_field])
+                    for target_field in insert_fields_list:
+                        # フィールドにマージ処理が必要な場合
+                        if target_field in merge_fields:
+                            value = process_default_value(merge_fields[target_field])
+                        else:
+                            # クエリ結果から対応する値を取得
+                            source_field = next((k for k, v in select_fields.items() if v == target_field), None)
+                            if source_field:
+                                value = row_data[list(select_fields.keys()).index(source_field)]
+                                # 元の値を記録する
+                                row_dict[source_field] = value
+                                # 型変換を適用
+                                conversion_rule = type_conversion_mapping.get(source_field)
+                                if conversion_rule:
+                                    value = convert_type(value, conversion_rule)
+                                    if isinstance(value, str):
+                                        if len(value) > 4 and target_field.strip() == 'FiscalYear':
+                                            value = value[:4]
+                                        elif len(value) > 6 and target_field.strip() == 'OutputYM':
+                                            value = f"{value[:4]}{value[5:7]}"
+                                        elif len(value) > 6 and target_field.strip() == 'AccountingYM':
+                                            value = f"{value[:4]}{value[5:7]}"
+                                
+                                source_values.append(row_dict[source_field])
                             else:
-                                # クエリ結果から対応する値を取得
-                                source_field = next((k for k, v in select_fields.items() if v == target_field), None)
-                                if source_field:
-                                    value = row_data[list(select_fields.keys()).index(source_field)]
-                                    # 元の値を記録します
-                                    row_dict[source_field] = value
-                                    # 型変換を適用
-                                    conversion_rule = type_conversion_mapping.get(source_field)
-                                    if conversion_rule:
-                                        value = convert_type(value, conversion_rule)
-                                        if isinstance(value, str):
-                                            if len(value) > 4 and target_field.strip() == 'FiscalYear':
-                                                value = value[:4]
-                                            elif len(value) > 6 and target_field.strip() == 'OutputYM':
-                                                value = f"{value[:4]}{value[5:7]}"
-                                            elif len(value) > 6 and target_field.strip() == 'AccountingYM':
-                                                value = f"{value[:4]}{value[5:7]}"
-                                else:
-                                    value = None
+                                value = None
                             
-                            # 値を文字列形式に変換する
-                            if value is None:
-                                row_dict[target_field] = ''
-                            elif isinstance(value, datetime.datetime):
-                                row_dict[target_field] = value.strftime('%Y-%m-%d %H:%M:%S')
-                            elif isinstance(value, datetime.date):
-                                row_dict[target_field] = value.strftime('%Y-%m-%d')
-                            else:
-                                row_dict[target_field] = str(value)
+                        # 値を文字列形式に変換する
+                        if value is None:
+                            row_dict[target_field] = ''
+                        elif isinstance(value, datetime.datetime):
+                            row_dict[target_field] = value.strftime('%Y-%m-%d %H:%M:%S')
+                        elif isinstance(value, datetime.date):
+                            row_dict[target_field] = value.strftime('%Y-%m-%d')
+                        else:
+                            row_dict[target_field] = str(value)
                             
-                            insert_values.append(value)
+                        insert_values.append(value)                        
                         
-                        target_db.execute_query(insert_query, insert_values)
-                        insert_count += 1
-                        
-                    except Exception as e:
-                        error_count += 1
-                        row_dict['error_message'] = str(e)
-                        row_dict['error_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        batch_error_records.append(row_dict)
-                        print(f"    データの挿入に失敗しました: {str(e)}")
-                        # target_db.rollback()
-                        continue
-                    
-                    # 100件のレコードごとに1回送信
-                    if insert_count % 100 == 0:
+                    insert_values_list.append(tuple(insert_values))
+                    source_values_list.append(tuple(source_values))
+
+                # executemanyで一括 insert
+                try:
+                    if insert_values_list:
+                        cursor = target_db.connect()
+                        cursor.fast_executemany = True  # PyODBC使ってるなら超速！
+                        cursor.executemany(insert_query, insert_values_list)
                         target_db.commit()
-                        print(f"    {insert_count}/{len(rows)} 件のレコードが挿入されました")
-                
-                # 残りのトランザクションをコミットする
-                target_db.commit()
+                        insert_count = len(insert_values_list)
+                        print(f"    {insert_count}/{len(rows)} 件のレコードが挿入されました") 
+                except Exception as e:
+                    print(f"    executemany失敗。個別にretryします → {str(e)}")
+                    target_db.rollback()
+
+                    insert_count = 0
+                    success_rows = []
+                    # 1件ずつretry
+                    for i,row in enumerate(insert_values_list):
+                        try:                           
+                            cursor.execute(insert_query, row)
+                            success_rows.append(row)
+                            insert_count += 1
+                            if len(success_rows) >= commit_unit:
+                                target_db.commit()
+                                success_rows.clear()
+                        except Exception as e2:
+                            target_db.rollback()  # エラーが発生した場合はロールバック
+
+                            # 成功したレコードがあればコミット
+                            if success_rows:
+                                try:
+                                    cursor.fast_executemany = True  # PyODBC使ってるなら超速！
+                                    cursor.executemany(insert_query, success_rows)
+                                    target_db.commit()
+                                except Exception as commit_err:
+                                    print(f"commit に失敗: {commit_err}")
+                                    for success_row in success_rows:                        
+                                        cursor.execute(insert_query, success_row)
+                                        target_db.commit()                                   
+                                finally:
+                                    success_rows.clear()  # バッファをクリア
+
+                            error_count += 1
+                            error_row = {}
+                            source_row = rows[i]  # ソースからの元データ（select_fieldsの順）
+
+                            for dst_field, value in zip(insert_fields_list, row):
+                                src_field = next((k for k, v in select_fields.items() if v == dst_field), None)
+                                if src_field and src_field in select_fields:
+                                    src_idx = list(select_fields.keys()).index(src_field)
+                                    src_val = source_row[src_idx] if source_row[src_idx] is not None else ''
+                                    # ログへ格納
+                                    error_row[f"{src_field}"] = str(src_val)
+
+                                # 変換後の値（ターゲット）
+                                dst_val = '' if value is None else str(value)
+                                # ログへ格納
+                                error_row[f"{dst_field}"] = dst_val
+                            error_row['error_message'] = str(e2)
+                            error_row['error_time'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            batch_error_records.append(error_row)
+                    
+                    if success_rows:
+                        target_db.commit()
+                        success_rows.clear()
+                    
+                    print(f"    {insert_count}/{len(rows)} 件のレコードが挿入されました")      
                 
                 # エラーデータをログに記録する
                 if batch_error_records:
@@ -226,6 +294,12 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
             print(f"    バッチ数: {batch_count}")
             if error_count > 0:
                 print(f"    エラーログファイル: {error_log_file}")
+
+            # 移行後レコード数の取得
+            target_count_query = f"SELECT COUNT(*) as total FROM {sheet.physical_name}"
+            target_total_count = target_db.fetch_all(target_count_query)[0][0]
+            # ログ出力
+            logging.info(f"移行後レコード数:{sheet.physical_name} : {target_total_count}")
             
     except Exception as e:
         print(f"一対一移行中にエラーが発生しました: {str(e)}")

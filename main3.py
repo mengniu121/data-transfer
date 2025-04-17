@@ -67,35 +67,52 @@ class DataMigrationExecutor:
             print("\nデータ移行を開始します...")
             
             # 指定された移行設定の取得
-            migration_sheet = self.parser.parse_mapping_data_to_run(mapping_name)
+            migration_sheets = self.parser.parse_mapping_data_to_run(mapping_name)
             
-            # 移行タイプに応じた移行の実行
-            if migration_sheet.migration_type == MigrationType.ONE_TO_ONE:
+            # 移行タイプでグループ化
+            one_to_one_sheets = []
+            one_to_many_sheets = []
+            many_to_one_sheets = []
+            
+            for sheet in migration_sheets:
+                if sheet.migration_type == MigrationType.ONE_TO_ONE:
+                    one_to_one_sheets.append(sheet)
+                elif sheet.migration_type == MigrationType.ONE_TO_MANY:
+                    one_to_many_sheets.append(sheet)
+                elif sheet.migration_type == MigrationType.MANY_TO_ONE:
+                    many_to_one_sheets.append(sheet)
+            
+            # 1対1移行を開始します
+            if one_to_one_sheets:
                 print("\n=== 1対1移行を開始します ===")
                 execute_one_to_one_migration(
                     self.excel_path,
                     self.parser,
                     self.source_db,
                     self.target_db,
-                    [migration_sheet]
+                    one_to_one_sheets
                 )
-            elif migration_sheet.migration_type == MigrationType.ONE_TO_MANY:
+            
+            # 1対多移行を開始します
+            if one_to_many_sheets:
                 print("\n=== 1対多移行を開始します ===")
                 execute_one_to_many_migration(
                     self.excel_path,
                     self.parser,
                     self.source_db,
                     self.target_db,
-                    [migration_sheet]
+                    one_to_many_sheets
                 )
-            elif migration_sheet.migration_type == MigrationType.MANY_TO_ONE:
+            
+            # 多対1移行を開始します
+            if many_to_one_sheets:
                 print("\n=== 多対1移行を開始します ===")
                 execute_many_to_one_migration(
                     self.excel_path,
                     self.parser,
                     self.source_db,
                     self.target_db,
-                    [migration_sheet]
+                    many_to_one_sheets
                 )
             
             print("\nデータ移行が完了しました")
@@ -118,8 +135,8 @@ def main():
     
     # マッピング名パラメータの取得
     mapping_name = sys.argv[1]
-    # mapping_name="dbo.AccountingDetailTbl"
-    excel_path = "数据移行2.xlsx"
+    # mapping_name="dbo.JobMaster"
+    excel_path = "データ移行.xlsx"
     # 移行の実行
     executor = DataMigrationExecutor(excel_path)
     executor.execute_migration(mapping_name)
