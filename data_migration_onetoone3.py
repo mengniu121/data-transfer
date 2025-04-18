@@ -301,12 +301,6 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
             # ログ出力
             logging.info(f"移行後レコード数:{sheet.physical_name} : {target_total_count}")
             
-            # 统计目标表的数据条数
-            count_query = f"SELECT COUNT(*) as total FROM {sheet.physical_name}"
-            target_count = target_db.fetch_all(count_query)[0][0]
-            print(f"    ソーステーブル総レコード数: {total_count}")
-            print(f"    ターゲットテーブル総レコード数: {target_count}")
-            
     except Exception as e:
         print(f"一対一移行中にエラーが発生しました: {str(e)}")
         import traceback
