@@ -238,6 +238,7 @@ def execute_one_to_one_migration(excel_path: str, parser, source_db, target_db, 
                                     target_db.commit()
                                 except Exception as commit_err:
                                     print(f"commit に失敗: {commit_err}")
+                                    target_db.rollback()  # エラーが発生した場合はロールバック
                                     for success_row in success_rows:                        
                                         cursor.execute(insert_query, success_row)
                                         target_db.commit()                                   
