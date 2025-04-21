@@ -73,7 +73,7 @@ def recover_data(excel_path: str, target_db, error_file: Path, sheet_name: str, 
         print(f"\nエラーデータファイルの処理を開始: {error_file}")
         
         # エラーデータの読み込み
-        error_df = pd.read_csv(error_file, encoding='utf-8')  # shift-jisエンコードでファイルを読み込み
+        error_df = pd.read_csv(error_file, encoding='utf-8',dtype=str)  # shift-jisエンコードでファイルを読み込み
         total_errors = len(error_df)
         print(f"エラー記録は {total_errors} 件です")
         
