@@ -36,7 +36,7 @@ def convert_type(value, conversion_rule):
             return str(value)
         
         # 整数型の処理 
-        elif data_type == 'int':
+        elif data_type == 'int' or data_type == 'tinyint':
             return int(float(value)) # 文字列やfloatをintに変換（例: "5.0" → 5）
         
         # 小数型（decimal）の処理
@@ -85,7 +85,7 @@ def convert_type(value, conversion_rule):
                 return date_obj.strftime('%Y-%m-%d')
         
         # 日時型（datetime）の処理
-        elif data_type == 'datetime':
+        elif data_type == 'datetime' or data_type == 'datetime2':
             if value=='':
                 return None
             date_str = str(value).strip()
